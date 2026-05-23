@@ -1,0 +1,63 @@
+version: "3.9"
+
+services:
+  adguard:
+    image: adguard/adguardhome:latest
+    container_name: guardhome-adguard
+    restart: unless-stopped
+    volumes:
+      - adguard_work:/opt/adguardhome/work
+      - adguard_conf:/opt/adguardhome/conf
+    ports:
+      - "53:53/tcp"
+      - "53:53/udp"
+      - "3000:3000/tcp"   # AdGuard initial setup UI (disable after setup)
+      - "80:80/tcp"       # AdGuard Home web UI (post-setup)
+    networks:
+      - guardhome
+
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: guardhome-api
+    restart: unless-stopped
+    environment:
+      - ADGUARD_URL=http://adguard:80
+      - ADGUARD_USER=${ADGUARD_USER:-admin}
+      - ADGUARD_PASS=${ADGUARD_PASS:-guardhome}
+      - SECRET_KEY=${SECRET_KEY:-change-me-in-production}
+      - DB_PATH=/data/guardhome.db
+    volumes:
+      - guardhome_data:/data
+      - ./core:/app/core
+    ports:
+      - "8000:8000"
+    depends_on:
+      - adguard
+    networks:
+      - guardhome
+
+  dashboard:
+    build:
+      context: ./dashboard
+      dockerfile: Dockerfile
+    container_name: guardhome-dashboard
+    restart: unless-stopped
+    environment:
+      - VITE_API_URL=http://localhost:8000
+    ports:
+      - "3001:80"
+    depends_on:
+      - api
+    networks:
+      - guardhome
+
+volumes:
+  adguard_work:
+  adguard_conf:
+  guardhome_data:
+
+networks:
+  guardhome:
+    driver: bridge

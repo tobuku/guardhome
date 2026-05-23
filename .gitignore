@@ -1,0 +1,16 @@
+.env
+*.pyc
+__pycache__/
+*.egg-info/
+.venv/
+venv/
+node_modules/
+dist/
+build/
+*.db
+*.db-shm
+*.db-wal
+adguard_work/
+adguard_conf/
+guardhome_data/
+.DS_Store
