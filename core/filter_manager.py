@@ -8,7 +8,7 @@ Filter list strategy:
 import logging
 from typing import Dict, List
 
-from core.adguard_bridge import AdGuardBridge
+from core.adguard_bridge import AdGuardBridge, sync_client
 
 log = logging.getLogger("guardhome.filter_manager")
 
@@ -186,13 +186,35 @@ async def sync_category_lists(categories: Dict[str, bool]) -> None:
 
 async def sync_child_rules(child_id: int, db) -> None:
     """After a category toggle for one child, push their rules to AdGuard."""
-    rows = await db.execute_fetchall(
-        "SELECT category, blocked FROM category_rules WHERE child_id=?", (child_id,)
+    # Step 1: Update per-client blocked_services for this child's devices
+    devices = await db.execute_fetchall(
+        "SELECT * FROM devices WHERE child_id=?", (child_id,)
     )
-    categories = {r["category"]: bool(r["blocked"]) for r in rows}
-    # For simplicity in MVP, category lists are global (affect all clients).
-    # Phase 2: per-client filtering via AdGuard client profiles.
-    await sync_category_lists(categories)
+    for device in devices:
+        await sync_client(device, child_id, db)
+
+    # Step 2: Recompute global filter lists as union of ALL children's rules.
+    # A category list stays enabled if ANY child has it blocked.
+    all_rows = await db.execute_fetchall(
+        "SELECT category, blocked FROM category_rules"
+    )
+    union: dict[str, bool] = {}
+    for row in all_rows:
+        cat = row["category"]
+        if cat not in union:
+            union[cat] = False
+        if row["blocked"]:
+            union[cat] = True
+    await sync_category_lists(union)
+
+
+async def sync_all_children_rules(db) -> None:
+    """Re-sync filter rules for every child — used on setup complete and manual re-sync."""
+    children = await db.execute_fetchall("SELECT id FROM children")
+    for child in children:
+        await sync_child_rules(child["id"], db)
+    if not children:
+        await sync_category_lists({})
 
 
 async def sync_all_rules(db) -> None:

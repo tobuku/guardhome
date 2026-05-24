@@ -17,4 +17,9 @@ async def init_db():
         schema = f.read()
     async with aiosqlite.connect(DB_PATH) as db:
         await db.executescript(schema)
+        # Migration: add deduplication index to dns_log if not present
+        await db.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS uq_dns_log "
+            "ON dns_log (child_id, domain, ts)"
+        )
         await db.commit()

@@ -102,3 +102,4 @@ CREATE INDEX IF NOT EXISTS idx_dns_log_ts       ON dns_log(ts DESC);
 CREATE INDEX IF NOT EXISTS idx_dns_log_client   ON dns_log(client_ip);
 CREATE INDEX IF NOT EXISTS idx_dns_log_child    ON dns_log(child_id);
 CREATE INDEX IF NOT EXISTS idx_alerts_unread    ON alerts(child_id, read);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_dns_log    ON dns_log(child_id, domain, ts);
