@@ -46,7 +46,35 @@ echo ""
 info "Stack is up. Waiting for services to initialize..."
 sleep 5
 
-# --- Check health ---
+# --- Auto-configure AdGuard on first run ---
+ADGUARD_PASS="${ADGUARD_PASS:-guardhome}"
+ADGUARD_USER="${ADGUARD_USER:-admin}"
+
+info "Waiting for AdGuard setup wizard (port 3000)..."
+AGH_READY=false
+for i in {1..24}; do
+    if curl -sf http://localhost:3000/control/install/get_addresses >/dev/null 2>&1; then
+        AGH_READY=true; break
+    fi
+    sleep 5
+done
+
+if [ "$AGH_READY" = true ]; then
+    info "Configuring AdGuard Home (admin / $ADGUARD_PASS)..."
+    curl -sf -X POST http://localhost:3000/control/install/configure \
+        -H "Content-Type: application/json" \
+        -d "{
+              \"web\":      {\"ip\": \"0.0.0.0\", \"port\": 80, \"https_port\": 0},
+              \"dns\":      {\"ip\": \"0.0.0.0\", \"port\": 53},
+              \"username\": \"$ADGUARD_USER\",
+              \"password\": \"$ADGUARD_PASS\"
+            }" >/dev/null 2>&1 && info "AdGuard configured." || warn "AdGuard configure call failed — may already be set up."
+    sleep 5
+else
+    info "AdGuard setup wizard not found — assuming already configured."
+fi
+
+# --- Check API health ---
 API_OK=false
 for i in {1..12}; do
     if curl -sf http://localhost:8000/health >/dev/null 2>&1; then
@@ -66,11 +94,11 @@ echo "  ================================================================"
 echo "   SETUP COMPLETE"
 echo ""
 echo "   Dashboard:       http://localhost:3001"
-echo "   API:             http://localhost:8000"
+echo "   API docs:        http://localhost:8000/docs"
 echo "   AdGuard Home:    http://localhost:80"
 echo ""
-echo "   Next step: Open the dashboard and run the Setup Wizard."
-echo "   Point your router's DNS to this machine's IP address."
+echo "   Open the dashboard and complete the Setup Wizard."
+echo "   Then point your router's DNS to this machine's IP."
 echo ""
 echo "   To stop:   docker compose down"
 echo "   To update: git pull && docker compose build && docker compose up -d"

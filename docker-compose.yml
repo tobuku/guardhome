@@ -44,8 +44,6 @@ services:
       dockerfile: Dockerfile
     container_name: guardhome-dashboard
     restart: unless-stopped
-    environment:
-      - VITE_API_URL=http://localhost:8000
     ports:
       - "3001:80"
     depends_on:
